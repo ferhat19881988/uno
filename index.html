@@ -1,0 +1,1504 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UNO - Gerçekçi Deneyim (5 El)</title>
+<style>
+  :root{
+    --red:#ff5555;
+    --blue:#5555ff;
+    --green:#55aa55;
+    --yellow:#ffaa00;
+    --black:#2d2d2d;
+
+    --card-width:80px;
+    --card-height:120px;
+  }
+
+  body{
+    margin:0;
+    overflow:hidden;
+    background: radial-gradient(circle, #256d40 0%, #0f2e1b 100%);
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    color:#fff;
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+    user-select:none;
+    position:relative;
+  }
+
+  /* Hafif hareketli overlay (juicy, ama minimal) */
+  body::before{
+    content:"";
+    position:fixed;
+    inset:-20%;
+    pointer-events:none;
+    background:
+      url('https://www.transparenttextures.com/patterns/diagmonds-light.png');
+    opacity:0.10;
+    mix-blend-mode: overlay;
+    animation: drift 24s linear infinite;
+    transform: rotate(8deg);
+  }
+  @keyframes drift{
+    0%   { background-position: 0 0; }
+    100% { background-position: 520px 320px; }
+  }
+
+  #game-table{
+    position:relative;
+    flex:1;
+    display:grid;
+    grid-template-columns:150px 1fr 150px;
+    grid-template-rows:150px 1fr 180px;
+    width:100%;
+    max-width:1200px;
+    margin:0 auto;
+  }
+
+  .player-area{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    position:relative;
+    transition:all .3s;
+  }
+  .player-active .avatar{
+    box-shadow:0 0 20px 5px gold;
+    border-color:gold;
+    transform:scale(1.1);
+  }
+
+  .avatar{
+    width:60px;
+    height:60px;
+    background:#333;
+    border-radius:50%;
+    border:4px solid #fff;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    font-size:24px;
+    z-index:10;
+    position:relative;
+  }
+
+  .player-info{
+    position:absolute;
+    background:rgba(0,0,0,.7);
+    padding:4px 10px;
+    border-radius:10px;
+    font-size:12px;
+    white-space:nowrap;
+  }
+
+  #top-player{ grid-column:2; grid-row:1; flex-direction:column; }
+  #top-player .player-info{ top:70px; }
+
+  #left-player{ grid-column:1; grid-row:2; flex-direction:row; }
+  #left-player .player-info{ top:80px; }
+
+  #right-player{ grid-column:3; grid-row:2; flex-direction:row; }
+  #right-player .player-info{ top:80px; }
+
+  #user-player{ grid-column:2; grid-row:3; flex-direction:column-reverse; }
+
+  #center-area{
+    grid-column:2;
+    grid-row:2;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    gap:40px;
+    position:relative;
+  }
+
+  .deck-pile, .discard-pile{
+    width:var(--card-width);
+    height:var(--card-height);
+    border-radius:10px;
+    position:relative;
+  }
+
+  .deck-pile{
+    background: url('https://www.transparenttextures.com/patterns/diagmonds-light.png'), #111;
+    border:2px solid rgba(255,255,255,.2);
+    cursor:pointer;
+    box-shadow:2px 2px 10px rgba(0,0,0,.5);
+  }
+  .deck-pile:hover{ transform: translateY(-2px); }
+
+  /* KART */
+  .card{
+    width:var(--card-width);
+    height:var(--card-height);
+    border-radius:12px;
+    background:#fdfdfd;
+    position:relative;
+    box-shadow: -2px 2px 10px rgba(0,0,0,.35), inset 0 0 0 2px rgba(0,0,0,.08);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    font-weight:800;
+    overflow:hidden;
+  }
+  .card::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    border-radius:12px;
+    box-shadow: inset 0 0 0 3px rgba(255,255,255,.65);
+    pointer-events:none;
+  }
+
+  .card-inner{
+    width:90%;
+    height:92%;
+    border-radius:10px;
+    position:relative;
+    overflow:hidden;
+    box-shadow: inset 0 0 14px rgba(0,0,0,.18);
+  }
+
+  .card.red .card-inner{ background: linear-gradient(145deg, rgba(255,255,255,.18), rgba(0,0,0,.08)), var(--red); }
+  .card.blue .card-inner{ background: linear-gradient(145deg, rgba(255,255,255,.18), rgba(0,0,0,.08)), var(--blue); }
+  .card.green .card-inner{ background: linear-gradient(145deg, rgba(255,255,255,.18), rgba(0,0,0,.08)), var(--green); }
+  .card.yellow .card-inner{ background: linear-gradient(145deg, rgba(255,255,255,.18), rgba(0,0,0,.08)), var(--yellow); }
+  .card.black .card-inner{ background: linear-gradient(145deg, rgba(255,255,255,.12), rgba(0,0,0,.15)), var(--black); }
+
+  .card-oval{
+    position:absolute;
+    top:50%; left:50%;
+    transform: translate(-50%, -50%) rotate(-18deg);
+    width:78%;
+    height:62%;
+    background: rgba(255,255,255,.96);
+    border-radius:50%;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    box-shadow: inset 2px 2px 5px rgba(0,0,0,.18), 0 2px 6px rgba(0,0,0,.18);
+  }
+
+  .big-value{
+    font-size:36px;
+    text-shadow:2px 2px 0 rgba(0,0,0,.18);
+    -webkit-text-stroke:1px rgba(0,0,0,.85);
+    letter-spacing:.5px;
+  }
+  .card.red .big-value{ color:var(--red); }
+  .card.blue .big-value{ color:var(--blue); }
+  .card.green .big-value{ color:var(--green); }
+  .card.yellow .big-value{ color:var(--yellow); }
+  .card.black .big-value{ color:#111; }
+
+  .small-value{
+    position:absolute;
+    font-size:14px;
+    color:rgba(255,255,255,.95);
+    padding:2px;
+    text-shadow: 0 1px 2px rgba(0,0,0,.45);
+    font-weight:900;
+  }
+  .tl{ top:5px; left:7px; }
+  .br{ bottom:5px; right:7px; transform: rotate(180deg); }
+
+  .card.back{
+    background:#111;
+    border:3px solid rgba(255,255,255,.92);
+  }
+  .card.back .card-inner{
+    background: radial-gradient(circle at 30% 30%, #ff7777 0%, #aa0000 55%, #3a0000 100%);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    position:relative;
+  }
+  .card.back .card-inner::before{
+    content:"";
+    position:absolute;
+    width:110%;
+    height:80%;
+    background: rgba(0,0,0,.18);
+    transform: rotate(-25deg);
+    border-radius:999px;
+    box-shadow: inset 0 0 0 3px rgba(255,255,255,.18);
+  }
+  .card.back .logo{
+    font-size:26px;
+    transform: rotate(-25deg);
+    color:#ffd166;
+    text-shadow:2px 2px 0 #000;
+    font-style:italic;
+    z-index:2;
+    letter-spacing:1px;
+  }
+
+  /* EL */
+  #user-hand{
+    display:flex;
+    justify-content:center;
+    align-items:flex-end;
+    height:140px;
+    width:100%;
+    margin-bottom:20px;
+    padding: 0 10px;
+    box-sizing:border-box;
+  }
+  #user-hand .card{
+    cursor:pointer;
+    transform-origin: bottom center;
+    transition: transform .2s, filter .2s, margin-bottom .2s;
+  }
+  #user-hand .card:hover{
+    transform: translateY(-20px) scale(1.1) rotate(0deg) !important;
+    z-index:1000 !important;
+  }
+
+  .bot-hand-visual{ display:flex; justify-content:center; }
+  .bot-card-mini{
+    width:20px;
+    height:30px;
+    background:#aa0000;
+    border:1px solid rgba(255,255,255,.9);
+    border-radius:4px;
+    margin:1px;
+    box-shadow:0 2px 4px rgba(0,0,0,.35);
+  }
+
+  /* ANİMASYON */
+  #animation-layer{
+    position:absolute;
+    top:0; left:0;
+    width:100%; height:100%;
+    pointer-events:none;
+    z-index:999;
+  }
+  .flying-card{
+    position:absolute;
+    z-index:1000;
+    box-shadow:0 10px 20px rgba(0,0,0,.55);
+    will-change: transform, left, top;
+  }
+
+  /* MESAJ */
+  #message-box{
+    position:absolute;
+    top:20px;
+    left:50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,.82);
+    padding: 10px 30px;
+    border-radius: 20px;
+    font-size: 18px;
+    z-index: 220;
+    border: 1px solid rgba(255,255,255,.2);
+    backdrop-filter: blur(3px);
+  }
+
+  /* SOL ALT: SON HAMLE + LOG */
+  #last-move-badge{
+    position:fixed;
+    left:16px;
+    bottom:16px;
+    z-index:240;
+    background: rgba(0,0,0,.62);
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 12px;
+    padding: 8px 10px;
+    font-size: 12px;
+    max-width: min(380px, 92vw);
+    pointer-events:none;
+    backdrop-filter: blur(2px);
+    opacity: .92;
+  }
+
+  #play-log{
+    position:fixed;
+    left:16px;
+    bottom:66px;
+    z-index:240;
+    width: min(380px, 92vw);
+    font-size: 12px;
+    color: rgba(255,255,255,.92);
+    background: rgba(0,0,0,.45);
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 12px;
+    padding: 8px 10px;
+    backdrop-filter: blur(2px);
+    opacity: .9;
+  }
+  #play-log .row{
+    display:flex;
+    justify-content: space-between;
+    gap:10px;
+    padding: 2px 0;
+    border-bottom: 1px dashed rgba(255,255,255,.08);
+  }
+  #play-log .row:last-child{ border-bottom:none; }
+  #play-log .who{ color:#ffd166; font-weight:800; }
+  #play-log .what{ opacity:.95; }
+
+  /* Skor */
+  #scoreboard{
+    position:fixed;
+    right:16px;
+    top:16px;
+    z-index:240;
+    background: rgba(0,0,0,.55);
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 12px;
+    padding: 8px 10px;
+    font-size: 12px;
+    backdrop-filter: blur(2px);
+    opacity: .92;
+    line-height: 1.35;
+  }
+  #scoreboard .title{
+    font-weight:900;
+    color:#ffd166;
+    margin-bottom:4px;
+  }
+  #scoreboard .muted{ opacity:.85; }
+
+  /* Yön göstergesi */
+  #direction-indicator{
+    position:absolute;
+    width:200px;
+    height:200px;
+    border:2px dashed rgba(255,255,255,.1);
+    border-radius:50%;
+    pointer-events:none;
+    transition: transform .5s;
+  }
+  #direction-arrow{
+    position:absolute;
+    top:-10px;
+    left:50%;
+    font-size:24px;
+    color: rgba(255,255,255,.5);
+  }
+
+  /* Renk modal */
+  #color-modal{
+    position:fixed; inset:0;
+    background: rgba(0,0,0,.85);
+    display:none;
+    justify-content:center;
+    align-items:center;
+    z-index:2000;
+  }
+  .color-grid{
+    display:grid;
+    grid-template-columns:100px 100px;
+    gap:20px;
+  }
+  .color-btn{
+    width:100px; height:100px;
+    border-radius:15px;
+    border:4px solid white;
+    cursor:pointer;
+    transition: transform .2s;
+  }
+  .color-btn:hover{ transform: scale(1.1); }
+
+  #current-color-indicator{
+    position:fixed;
+    top:16px;
+    left:16px;
+    width:38px;
+    height:38px;
+    border-radius:50%;
+    border:2px solid #fff;
+    box-shadow:0 0 10px rgba(0,0,0,.5);
+    display:none;
+    z-index:240;
+  }
+
+  /* Kontroller */
+  #controls{
+    position:absolute;
+    bottom:20px;
+    right:20px;
+    display:flex;
+    gap:10px;
+    z-index:200;
+  }
+  button{
+    padding: 12px 18px;
+    border:none;
+    border-radius:8px;
+    font-weight:900;
+    cursor:pointer;
+    font-size: 15px;
+    box-shadow:0 4px 0 rgba(0,0,0,.4);
+    transition: transform .1s, filter .2s;
+    white-space: nowrap;
+  }
+  button:active{ transform: translateY(4px); box-shadow:none; }
+
+  .btn-uno{
+    background: linear-gradient(to bottom, #ffaa00, #cc8800);
+    color:#222;
+  }
+  .btn-uno.shout{ animation: pulse 1s infinite; background:red; color:white; }
+
+  .btn-new{
+    background: linear-gradient(to bottom, #6ee7ff, #2196f3);
+    color:#071522;
+  }
+  .btn-new:hover{ filter: brightness(1.05); }
+
+  @keyframes pulse{
+    0%{ transform: scale(1); }
+    50%{ transform: scale(1.08); }
+    100%{ transform: scale(1); }
+  }
+
+  /* Final modal */
+  #final-modal{
+    position:fixed; inset:0;
+    background: rgba(0,0,0,.82);
+    display:none;
+    justify-content:center;
+    align-items:center;
+    z-index:3000;
+  }
+  .final-card{
+    width: min(520px, 92vw);
+    background: rgba(15,20,18,.96);
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 18px;
+    padding: 16px 16px 12px;
+    box-shadow: 0 18px 60px rgba(0,0,0,.55);
+  }
+  .final-card h2{
+    margin:0 0 10px;
+    font-size: 18px;
+    color:#ffd166;
+  }
+  .final-card .small{
+    opacity:.85;
+    font-size: 12px;
+    margin-bottom: 10px;
+  }
+  .final-grid{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .final-box{
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: 14px;
+    padding: 10px;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+  .final-list{
+    max-height: 180px;
+    overflow:auto;
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: 14px;
+    padding: 10px;
+    font-size: 13px;
+    line-height: 1.45;
+    margin-bottom: 12px;
+  }
+  .final-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+  }
+</style>
+</head>
+<body>
+
+<div id="message-box">Oyun Başlıyor...</div>
+<div id="current-color-indicator"></div>
+
+<div id="scoreboard"></div>
+<div id="play-log"></div>
+<div id="last-move-badge">Son hamle: -</div>
+
+<div id="color-modal">
+  <div class="color-grid">
+    <div class="color-btn" style="background:var(--red)" onclick="selectColor('red')"></div>
+    <div class="color-btn" style="background:var(--blue)" onclick="selectColor('blue')"></div>
+    <div class="color-btn" style="background:var(--green)" onclick="selectColor('green')"></div>
+    <div class="color-btn" style="background:var(--yellow)" onclick="selectColor('yellow')"></div>
+  </div>
+</div>
+
+<div id="final-modal">
+  <div class="final-card">
+    <h2>Maç Sonucu (5 El)</h2>
+    <div class="small" id="final-subtitle">—</div>
+
+    <div class="final-grid" id="final-scores"></div>
+
+    <div class="final-list" id="final-rounds"></div>
+
+    <div class="final-actions">
+      <button class="btn-new" onclick="startNewMatch()">Yeni Maç Başlat</button>
+    </div>
+  </div>
+</div>
+
+<div id="game-table">
+  <div id="animation-layer"></div>
+
+  <div class="player-area" id="top-player">
+    <div class="avatar" id="av-2">🤖</div>
+    <div class="player-info">Kuzey (<span id="count-2">7</span>)</div>
+    <div class="bot-hand-visual" id="vis-2"></div>
+  </div>
+
+  <div class="player-area" id="left-player">
+    <div class="avatar" id="av-1">🤖</div>
+    <div class="player-info">Batı (<span id="count-1">7</span>)</div>
+    <div class="bot-hand-visual" id="vis-1"></div>
+  </div>
+
+  <div class="player-area" id="right-player">
+    <div class="avatar" id="av-3">🤖</div>
+    <div class="player-info">Doğu (<span id="count-3">7</span>)</div>
+    <div class="bot-hand-visual" id="vis-3"></div>
+  </div>
+
+  <div id="center-area">
+    <div id="direction-indicator"><div id="direction-arrow">↻</div></div>
+    <div class="deck-pile" id="deck" onclick="playerDrawCard()"></div>
+    <div class="discard-pile" id="discard"></div>
+  </div>
+
+  <div class="player-area" id="user-player">
+    <div id="user-hand"></div>
+    <div class="player-info" style="margin-top:10px; color: gold;">SEN</div>
+  </div>
+</div>
+
+<div id="controls">
+  <button class="btn-uno" id="btn-uno" onclick="callUno()">UNO!</button>
+  <button class="btn-new" onclick="startNewMatch()">Yeni Oyun</button>
+</div>
+
+<script>
+  /* --- SABİTLER --- */
+  const COLORS = ['red','blue','green','yellow'];
+  const SPECIALS = ['skip','reverse','draw2'];
+  const SYMBOLS = { skip:'⊘', reverse:'⇄', draw2:'+2', wild:'🌈', draw4:'+4' };
+
+  const ANIM = {
+    playerThrowMs: 520,
+    botThrowMs: 1050,
+    botThinkMs: 950,
+    betweenBotPlaysMs: 520,
+    drawDelayMs: 700
+  };
+
+  // Bot “insansı hatalar”
+  const BOT = {
+    mistakeChance: 0.18,
+    drawInsteadChance: 0.45,
+    forgetUnoChance: 0.35,
+    sillyColorChance: 0.22
+  };
+
+  // Maç: 5 el
+  const MATCH = { totalRounds: 5 };
+
+  /* --- OYUN DURUMU --- */
+  let deck = [];
+  let discardPile = [];
+  let players = [[],[],[],[]]; // 0: Sen, 1: Batı, 2: Kuzey, 3: Doğu
+  let turn = 0;
+  let direction = 1;
+  let currentColor = null;
+  let gameActive = false;
+
+  // UNO takip (her oyuncu için)
+  let unoSaid = [false,false,false,false];
+  let unoPending = [false,false,false,false];
+
+  // Kullanıcı için UNO “grace window” (kart atar atmaz basabilsin)
+  let unoGraceUntil = [0,0,0,0]; // timestamp (ms)
+
+  // hamle geçmişi
+  let playLog = [];
+
+  // maç skoru (el kazançları)
+  let matchScores = [0,0,0,0];
+  let currentRound = 1;
+  let roundsHistory = []; // {round, winnerIdx}
+
+  /* --- SFX (WebAudio) --- */
+  let audioCtx = null;
+  function ensureAudio(){
+    if(!audioCtx){
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+  }
+  function beep(freq=440, dur=0.06, type='sine', gain=0.07){
+    try{
+      ensureAudio();
+      const t = audioCtx.currentTime;
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(freq, t);
+      g.gain.setValueAtTime(gain, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g);
+      g.connect(audioCtx.destination);
+      o.start(t);
+      o.stop(t + dur);
+    }catch(e){}
+  }
+  const SFX = {
+    deal: ()=> { beep(820,0.035,'square',0.06); setTimeout(()=>beep(720,0.03,'square',0.05),40); },
+    swish: ()=> beep(420,0.05,'triangle',0.05),
+    ding: ()=> { beep(880,0.06,'sine',0.08); setTimeout(()=>beep(1320,0.05,'sine',0.06),70); },
+    buzz: ()=> { beep(140,0.09,'sawtooth',0.07); setTimeout(()=>beep(120,0.08,'sawtooth',0.06),60); }
+  };
+
+  /* --- BAŞLAT / MAÇ --- */
+  function startNewMatch(){
+    hideFinalModal();
+    matchScores = [0,0,0,0];
+    currentRound = 1;
+    roundsHistory = [];
+    playLog = [];
+    resetUnoButton(true);
+    startRound();
+  }
+
+  function startRound(){
+    createDeck();
+    shuffleDeck();
+    dealCards();
+
+    // Sıralı el (renk/sayı)
+    sortAllHands();
+
+    // UNO tracking reset
+    unoSaid = [false,false,false,false];
+    unoPending = [false,false,false,false];
+    unoGraceUntil = [0,0,0,0];
+
+    // İlk kart: önerdiğin gibi sadece RAKAM kartı gelene kadar dön
+    let firstCard = drawCardLogic();
+    while(firstCard && firstCard.type !== 'number'){
+      deck.push(firstCard);
+      shuffleDeck();
+      firstCard = drawCardLogic();
+    }
+
+    discardPile = [firstCard];
+    currentColor = firstCard.color;
+
+    // round başında kullanıcı başlasın
+    turn = 0;
+    direction = 1;
+    gameActive = true;
+
+    renderDiscardCard(firstCard);
+    setLastMoveBadge(`El ${currentRound}`, `Başlangıç: ${cardText(firstCard, firstCard.color)}`);
+    addLogRow("El", `${currentRound} başladı`);
+
+    showMessage(`El ${currentRound}/${MATCH.totalRounds} - Sıra Sende!`);
+    updateDirectionUI();
+    updateUI();
+
+    SFX.deal();
+    startPlayerTurn();
+  }
+
+  /* --- DESTE --- */
+  function createDeck(){
+    deck = [];
+    COLORS.forEach(color=>{
+      deck.push({color, value:0, type:'number'});
+      for(let i=1;i<=9;i++){
+        deck.push({color, value:i, type:'number'});
+        deck.push({color, value:i, type:'number'});
+      }
+      SPECIALS.forEach(type=>{
+        deck.push({color, value:type, type});
+        deck.push({color, value:type, type});
+      });
+    });
+    for(let i=0;i<4;i++){
+      deck.push({color:'black', value:'wild', type:'wild'});
+      deck.push({color:'black', value:'draw4', type:'draw4'});
+    }
+  }
+
+  function shuffleDeck(){
+    for(let i=deck.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [deck[i], deck[j]]=[deck[j], deck[i]];
+    }
+  }
+
+  function dealCards(){
+    players=[[],[],[],[]];
+    for(let i=0;i<7;i++){
+      for(let p=0;p<4;p++){
+        players[p].push(drawCardLogic());
+      }
+    }
+  }
+
+  function drawCardLogic(){
+    if(deck.length===0){
+      if(discardPile.length>1){
+        const top = discardPile.pop();
+        deck = discardPile;
+        discardPile = [top];
+        shuffleDeck();
+        showMessage("Deste bitti, kartlar karıştırıldı!");
+        addLogRow("Deste","Karıştırıldı");
+      }else{
+        return null;
+      }
+    }
+    return deck.pop();
+  }
+
+  /* --- KART HTML --- */
+  function createCardHTML(card, isBack=false){
+    const div=document.createElement('div');
+    div.className=`card ${isBack?'back':card.color}`;
+    const inner=document.createElement('div');
+    inner.className='card-inner';
+    div.appendChild(inner);
+
+    if(isBack){
+      const logo=document.createElement('div');
+      logo.className='logo';
+      logo.innerText='UNO';
+      inner.appendChild(logo);
+    }else{
+      const displayVal = SYMBOLS[card.value] || card.value;
+
+      const tl=document.createElement('div');
+      tl.className='small-value tl';
+      tl.innerText=displayVal;
+      div.appendChild(tl);
+
+      const br=document.createElement('div');
+      br.className='small-value br';
+      br.innerText=displayVal;
+      div.appendChild(br);
+
+      const oval=document.createElement('div');
+      oval.className='card-oval';
+      inner.appendChild(oval);
+
+      const big=document.createElement('div');
+      big.className='big-value';
+      big.innerText=displayVal;
+      oval.appendChild(big);
+    }
+    return div;
+  }
+
+  /* --- SIRALAMA (hand sorting) --- */
+  function sortAllHands(){
+    for(let p=0;p<4;p++) players[p] = sortHand(players[p]);
+  }
+  function sortHand(hand){
+    // renk önceliği (UNO’da genelde böyle) + sayı/tip
+    const colorRank = { red:0, yellow:1, green:2, blue:3, black:4 };
+    const typeRank = { number:0, skip:1, reverse:2, draw2:3, wild:4, draw4:5 };
+
+    return hand.slice().sort((a,b)=>{
+      const ca = colorRank[a.color] ?? 9;
+      const cb = colorRank[b.color] ?? 9;
+      if(ca !== cb) return ca - cb;
+
+      const ta = typeRank[a.type] ?? 9;
+      const tb = typeRank[b.type] ?? 9;
+      if(ta !== tb) return ta - tb;
+
+      // number ise değere göre
+      const va = (typeof a.value === 'number') ? a.value : 99;
+      const vb = (typeof b.value === 'number') ? b.value : 99;
+      if(va !== vb) return va - vb;
+
+      // en sonda string karşılaştır
+      return String(a.value).localeCompare(String(b.value));
+    });
+  }
+
+  /* --- OYUN MANTIĞI --- */
+  function canPlay(card){
+    const top = discardPile[discardPile.length-1];
+    if(!top) return true;
+    if(card.color==='black') return true;
+    if(card.color===currentColor) return true;
+    if(card.value===top.value) return true;
+    return false;
+  }
+
+  function nextTurn(){
+    if(!gameActive) return;
+
+    // UNO cezası (grace window dolduysa)
+    applyUnoPenaltyIfNeeded();
+
+    // UNO state reset: 1 kart değilse temizle
+    for(let i=0;i<4;i++){
+      if(players[i].length !== 1){
+        unoPending[i] = false;
+        unoGraceUntil[i] = 0;
+        if(players[i].length > 1) unoSaid[i] = false;
+      }
+    }
+
+    // UNO butonu her tur başında default
+    resetUnoButton(false);
+
+    turn = (turn + direction + 4) % 4;
+    updateUI();
+
+    if(turn===0){
+      startPlayerTurn();
+    }else{
+      setTimeout(botPlay, ANIM.botThinkMs);
+    }
+  }
+
+  function startPlayerTurn(){
+    showMessage("Sıra Sende!");
+    renderHand();
+  }
+
+  /* --- UNO CEZASI --- */
+  function applyUnoPenaltyIfNeeded(){
+    const now = Date.now();
+    for(let p=0;p<4;p++){
+      if(unoPending[p] && !unoSaid[p]){
+        // kullanıcı için grace bitmeden ceza verme
+        if(p===0 && unoGraceUntil[p] && now < unoGraceUntil[p]) continue;
+
+        // ceza +2
+        players[p].push(drawCardLogic());
+        players[p].push(drawCardLogic());
+
+        // çektiği kartlar sıralansın
+        players[p] = sortHand(players[p]);
+
+        const name = (p===0) ? "SEN" : playerName(p);
+        showMessage(`${name} UNO demeyi unuttu: +2 ceza!`);
+        addLogRow(name, "UNO unuttu (+2)");
+        SFX.buzz();
+
+        unoPending[p] = false;
+        unoSaid[p] = false;
+        unoGraceUntil[p] = 0;
+
+        if(p!==0) setAvatar(p, "😬", 900);
+      }
+    }
+  }
+
+  /* --- OYUNCU HAMLELERİ --- */
+  function playerPlayCard(index){
+    if(turn!==0 || !gameActive) return;
+
+    const card = players[0][index];
+    if(!canPlay(card)){
+      shakeHand();
+      showMessage("Bu kartı oynayamazsın!");
+      SFX.buzz();
+      return;
+    }
+
+    if(card.color==='black'){
+      document.getElementById('color-modal').style.display='flex';
+      window.pendingCardIndex = index;
+    }else{
+      finishPlayerMove(index, card.color);
+    }
+  }
+
+  function selectColor(color){
+    document.getElementById('color-modal').style.display='none';
+    finishPlayerMove(window.pendingCardIndex, color);
+  }
+
+  function finishPlayerMove(index, chosenColor){
+    // elden çıkar (hemen)
+    const card = players[0].splice(index,1)[0];
+
+    // Kart attıktan sonra el sıralansın (kalanlar)
+    players[0] = sortHand(players[0]);
+    updateUI(); // el görseli hızlı güncellensin
+
+    // Eğer bu hamle sonrası 1 karta düşüyorsan: UNO penceresini ŞİMDİ aç
+    if(players[0].length === 1){
+      unoPending[0] = true;
+      // animasyon + küçük buffer kadar
+      unoGraceUntil[0] = Date.now() + ANIM.playerThrowMs + 650;
+      showMessage("1 kart kaldı! Hemen UNO de!");
+      const btn = document.getElementById('btn-uno');
+      btn.classList.add('shout');
+      setTimeout(()=>btn.classList.remove('shout'), ANIM.playerThrowMs + 650);
+    }
+
+    // animasyon kaynak elemanını bulmak için: render sonrası index kaydı bozulabilir.
+    // Bu yüzden, animasyonda "eldeki kart" yerine center-area yakınından uçuruyoruz:
+    const sourceElem = document.getElementById('user-player'); // stabil kaynak
+
+    SFX.swish();
+    animateThrow(sourceElem, card, {duration: ANIM.playerThrowMs, isBot:false}, ()=>{
+      playLogic(0, card, chosenColor);
+    });
+  }
+
+  function playerDrawCard(){
+    if(turn!==0 || !gameActive) return;
+
+    const card = drawCardLogic();
+    if(!card) return;
+
+    players[0].push(card);
+    players[0] = sortHand(players[0]);
+
+    addLogRow("SEN","Kart çekti");
+    SFX.deal();
+    renderHand();
+
+    if(canPlay(card)){
+      showMessage("Çektiğin kart oynanabilir. İstersen oynayabilirsin.");
+    }else{
+      showMessage("Oynayacak kart yok. Pas.");
+      setTimeout(nextTurn, 900);
+    }
+  }
+
+  /* --- BOT --- */
+  function botPlay(){
+    if(!gameActive) return;
+
+    const hand = players[turn];
+    const botName = playerName(turn);
+    const botIds = [null,'av-1','av-2','av-3'];
+
+    let playable = [];
+    hand.forEach((c,idx)=>{ if(canPlay(c)) playable.push({idx, card:c}); });
+
+    // BOT HATA: oynayabileceği halde çekebilir
+    if(playable.length>0 && Math.random() < BOT.mistakeChance && Math.random() < BOT.drawInsteadChance){
+      showMessage(`${botName} hata yaptı, kart çekti.`);
+      addLogRow(botName, "Hata: oynayabilecekken çekti");
+
+      setAvatar(turn, "😢", 900);
+      SFX.deal();
+
+      const newCard = drawCardLogic();
+      if(newCard) players[turn].push(newCard);
+      players[turn] = sortHand(players[turn]);
+      updateUI();
+
+      setTimeout(nextTurn, 900);
+      return;
+    }
+
+    if(playable.length>0){
+      const choice = playable[Math.floor(Math.random()*playable.length)];
+      const card = hand.splice(choice.idx,1)[0];
+
+      // kalan el sıralı kalsın
+      players[turn] = sortHand(players[turn]);
+
+      let chosenColor = card.color;
+      if(card.color==='black'){
+        const counts={red:0,blue:0,green:0,yellow:0};
+        players[turn].forEach(x=>{ if(x.color!=='black') counts[x.color]++; });
+        chosenColor = Object.keys(counts).reduce((a,b)=> counts[a]>counts[b]?a:b);
+        if(Math.random() < BOT.sillyColorChance){
+          chosenColor = COLORS[Math.floor(Math.random()*4)];
+          addLogRow(botName, "Hata: saçma renk seçti");
+        }else if(counts[chosenColor]===0){
+          chosenColor = COLORS[Math.floor(Math.random()*4)];
+        }
+      }
+
+      const sourceElem = document.getElementById(botIds[turn]);
+      SFX.swish();
+      animateThrow(sourceElem, card, {duration: ANIM.botThrowMs, isBot:true}, ()=>{
+        playLogic(turn, card, chosenColor);
+      });
+
+    }else{
+      showMessage(`${botName} kart çekti.`);
+      addLogRow(botName,"Kart çekti");
+      setAvatar(turn, "😢", 850);
+      SFX.deal();
+
+      const newCard = drawCardLogic();
+      if(newCard) players[turn].push(newCard);
+      players[turn] = sortHand(players[turn]);
+      updateUI();
+
+      // çektiğini bazen oynasın
+      if(newCard && canPlay(newCard) && Math.random() > 0.35){
+        setTimeout(()=>{
+          const idx = players[turn].length - 1;
+          const c = players[turn].splice(idx,1)[0];
+          players[turn] = sortHand(players[turn]);
+
+          let chosenColor = c.color;
+          if(c.color==='black'){
+            chosenColor = COLORS[Math.floor(Math.random()*4)];
+          }
+
+          const sourceElem = document.getElementById(botIds[turn]);
+          SFX.swish();
+          animateThrow(sourceElem, c, {duration: ANIM.botThrowMs, isBot:true}, ()=>{
+            playLogic(turn, c, chosenColor);
+          });
+        }, ANIM.drawDelayMs);
+      }else{
+        setTimeout(nextTurn, 900);
+      }
+    }
+  }
+
+  /* --- OYNAMA VE EFEKTLER --- */
+  function playLogic(playerIndex, card, chosenColor){
+    discardPile.push(card);
+    currentColor = (card.color==='black') ? chosenColor : card.color;
+
+    const who = (playerIndex===0) ? "SEN" : playerName(playerIndex);
+    const what = cardText(card, chosenColor);
+
+    setLastMoveBadge(who, what);
+    addLogRow(who, `Oynadı: ${what}`);
+
+    // El bitti mi?
+    if(players[playerIndex].length === 0){
+      if(playerIndex !== 0) setAvatar(playerIndex, "🏆", 1200);
+      endRound(playerIndex);
+      return;
+    }
+
+    // 1 karta düştü: UNO mekanizması (botlar için)
+    if(players[playerIndex].length === 1){
+      unoPending[playerIndex] = true;
+
+      if(playerIndex !== 0){
+        if(Math.random() > BOT.forgetUnoChance){
+          unoSaid[playerIndex] = true;
+          showMessage(`${who}: UNO!`);
+          addLogRow(who, "UNO dedi");
+          setAvatar(playerIndex, "😎", 900);
+          SFX.ding();
+        }else{
+          unoSaid[playerIndex] = false;
+          showMessage(`${who}... (UNO demeyi unuttu olabilir)`);
+          setAvatar(playerIndex, "😬", 900);
+        }
+      }
+    }
+
+    renderDiscardCard(card);
+    updateUI();
+
+    // Kart efektleri
+    if(card.type === 'skip'){
+      showMessage("Atla! (Sonraki oyuncu pas geçti)");
+      turn = (turn + direction + 4) % 4;
+    }else if(card.type === 'reverse'){
+      direction *= -1;
+      showMessage("Yön Değişti!");
+      updateDirectionUI();
+    }else if(card.type === 'draw2'){
+      const victim = (turn + direction + 4) % 4;
+      showMessage("+2 Ceza!");
+      players[victim].push(drawCardLogic());
+      players[victim].push(drawCardLogic());
+      players[victim] = sortHand(players[victim]);
+      addLogRow(playerName(victim), "+2 çekti");
+      setAvatar(victim, "😢", 900);
+      SFX.deal();
+      turn = victim;
+    }else if(card.type === 'draw4'){
+      const victim = (turn + direction + 4) % 4;
+      showMessage("+4 Ceza ve Renk: " + translateColor(chosenColor));
+      for(let i=0;i<4;i++) players[victim].push(drawCardLogic());
+      players[victim] = sortHand(players[victim]);
+      addLogRow(playerName(victim), "+4 çekti");
+      setAvatar(victim, "😢", 900);
+      SFX.deal();
+      turn = victim;
+    }else if(card.color === 'black'){
+      showMessage("Renk değişti: " + translateColor(chosenColor));
+    }else{
+      showMessage(`${who}: ${what}`);
+    }
+
+    setTimeout(nextTurn, (playerIndex===0) ? 280 : ANIM.betweenBotPlaysMs);
+  }
+
+  /* --- ROUND BİTİŞ / MAÇ --- */
+  function endRound(winnerIdx){
+    gameActive = false;
+
+    matchScores[winnerIdx] += 1;
+    roundsHistory.push({ round: currentRound, winner: winnerIdx });
+
+    const wName = (winnerIdx===0) ? "SEN" : playerName(winnerIdx);
+    addLogRow("El", `${currentRound} bitti: ${wName} kazandı`);
+    showMessage(`El ${currentRound} bitti! Kazanan: ${wName}`);
+    if(winnerIdx===0) SFX.ding();
+
+    updateUI();
+
+    if(currentRound < MATCH.totalRounds){
+      currentRound += 1;
+      setTimeout(()=> startRound(), 1400);
+    }else{
+      setTimeout(()=> showFinalModal(), 1100);
+    }
+  }
+
+  /* --- ANİMASYON --- */
+  function animateThrow(startElem, cardData, opts, callback){
+    const discardElem = document.getElementById('discard');
+    const startRect = startElem.getBoundingClientRect();
+    const endRect = discardElem.getBoundingClientRect();
+
+    const flyer = createCardHTML(cardData);
+    flyer.classList.add('flying-card');
+
+    const duration = (opts && opts.duration) ? opts.duration : 600;
+    flyer.style.transition = `left ${duration}ms cubic-bezier(0.175, 0.885, 0.32, 1.275),
+                             top ${duration}ms cubic-bezier(0.175, 0.885, 0.32, 1.275),
+                             transform ${duration}ms cubic-bezier(0.175, 0.885, 0.32, 1.275)`;
+
+    flyer.style.left = startRect.left + 'px';
+    flyer.style.top  = startRect.top + 'px';
+
+    const isBot = opts && opts.isBot;
+    flyer.style.transform = isBot
+      ? `scale(0.55) rotate(${(Math.random()*12-6).toFixed(1)}deg)`
+      : `scale(1) rotate(${(Math.random()*8-4).toFixed(1)}deg)`;
+
+    document.getElementById('animation-layer').appendChild(flyer);
+
+    const midX = (startRect.left + endRect.left)/2;
+    const midY = (startRect.top + endRect.top)/2 - (isBot ? 45 : 28);
+
+    requestAnimationFrame(()=>{
+      flyer.style.left = midX + 'px';
+      flyer.style.top  = midY + 'px';
+      flyer.style.transform = `scale(${isBot ? 0.82 : 1.05}) rotate(${(Math.random()*18-9).toFixed(1)}deg)`;
+    });
+
+    setTimeout(()=>{
+      flyer.style.left = endRect.left + 'px';
+      flyer.style.top  = endRect.top + 'px';
+      flyer.style.transform = `scale(1) rotate(${(Math.random()*16-8).toFixed(1)}deg)`;
+    }, Math.max(60, Math.floor(duration*0.42)));
+
+    setTimeout(()=>{
+      flyer.remove();
+      callback();
+    }, duration + 30);
+  }
+
+  function shakeHand(){
+    const hand=document.getElementById('user-hand');
+    hand.style.transform="translateX(10px)";
+    setTimeout(()=>hand.style.transform="translateX(-10px)",50);
+    setTimeout(()=>hand.style.transform="translateX(5px)",100);
+    setTimeout(()=>hand.style.transform="translateX(0)",150);
+  }
+
+  /* --- UI --- */
+  function updateUI(){
+    document.querySelectorAll('.player-area').forEach(el=>el.classList.remove('player-active'));
+    const ids=['user-player','left-player','top-player','right-player'];
+    document.getElementById(ids[turn]).classList.add('player-active');
+
+    document.getElementById('count-1').innerText = players[1].length;
+    document.getElementById('count-2').innerText = players[2].length;
+    document.getElementById('count-3').innerText = players[3].length;
+
+    renderBotVisuals(1,'vis-1');
+    renderBotVisuals(2,'vis-2');
+    renderBotVisuals(3,'vis-3');
+
+    const indicator=document.getElementById('current-color-indicator');
+    if(currentColor){
+      indicator.style.display='block';
+      indicator.style.background =
+        currentColor==='blue' ? 'var(--blue)' :
+        currentColor==='red' ? 'var(--red)' :
+        currentColor==='green' ? 'var(--green)' : 'var(--yellow)';
+    }
+
+    renderHand();
+    renderLog();
+    renderScoreboard();
+  }
+
+  function renderBotVisuals(pIndex, elemId){
+    const container=document.getElementById(elemId);
+    container.innerHTML='';
+    for(let i=0;i<players[pIndex].length;i++){
+      const div=document.createElement('div');
+      div.className='bot-card-mini';
+      container.appendChild(div);
+    }
+  }
+
+  /* --- Dinamik overlap (mobilde daha seçilebilir) --- */
+  function renderHand(){
+    const container=document.getElementById('user-hand');
+    container.innerHTML='';
+
+    const n = players[0].length;
+    const cardW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--card-width'),10) || 80;
+
+    // container genişliğine göre spacing hesapla
+    const available = container.clientWidth || 360;
+    const maxSpacing = 62; // çok açılmasın
+    const minSpacing = 22; // çok da sıkışmasın
+
+    // ideal spacing: (available - cardW) / (n-1)
+    let spacing = (n<=1) ? cardW : Math.floor((available - cardW) / (n - 1));
+    spacing = Math.max(minSpacing, Math.min(maxSpacing, spacing));
+
+    players[0].forEach((card,index)=>{
+      const el = createCardHTML(card);
+
+      // overlap: margin-left negatif, ama dinamik
+      if(index>0){
+        el.style.marginLeft = (spacing - cardW) + "px";
+      }else{
+        el.style.marginLeft = "0px";
+      }
+
+      if(turn===0 && gameActive && canPlay(card)){
+        el.style.marginBottom="20px";
+        el.onclick=()=>playerPlayCard(index);
+      }else{
+        el.style.filter="brightness(0.7)";
+        if(turn===0 && gameActive) el.onclick=()=>{ shakeHand(); SFX.buzz(); };
+      }
+
+      // fan açısı (spacing küçüldükçe açı da azalsın)
+      const baseAngle = 4.5;
+      const angleFactor = Math.max(0.65, Math.min(1.0, spacing / 55));
+      const angle = (index - (n - 1)/2) * (baseAngle * angleFactor);
+      el.style.transform = `rotate(${angle}deg)`;
+
+      container.appendChild(el);
+    });
+  }
+
+  function renderDiscardCard(card){
+    const container=document.getElementById('discard');
+    container.innerHTML='';
+    const el=createCardHTML(card);
+    el.style.transform = 'rotate(' + (Math.random()*10-5) + 'deg)';
+    container.appendChild(el);
+  }
+
+  function updateDirectionUI(){
+    const dir=document.getElementById('direction-indicator');
+    if(direction===1){
+      dir.style.transform="rotate(0deg)";
+      document.getElementById('direction-arrow').innerText="↻";
+    }else{
+      dir.style.transform="rotate(-180deg)";
+      document.getElementById('direction-arrow').innerText="↺";
+    }
+  }
+
+  function showMessage(msg){
+    const box=document.getElementById('message-box');
+    box.innerText=msg;
+    box.style.transform="translateX(-50%) scale(1.08)";
+    setTimeout(()=>box.style.transform="translateX(-50%) scale(1)",170);
+  }
+
+  /* --- UNO BUTONU --- */
+  function callUno(){
+    const btn = document.getElementById('btn-uno');
+
+    if(!gameActive || turn !== 0){
+      flashUnoButton("Sıra sende değil", false);
+      SFX.buzz();
+      return;
+    }
+
+    // 1) Eğer UNO pending ise (kart attın, 1'e düştün): burada asıl önemli timing
+    if(unoPending[0]){
+      unoSaid[0] = true;
+      flashUnoButton("UNO!", true);
+      addLogRow("SEN","UNO dedi");
+      setAvatar(0, "😎", 800);
+      SFX.ding();
+      return;
+    }
+
+    // 2) Pre-UNO (elde 2 kart varken) — gerçek oyunda sık görülür
+    if(players[0].length === 2){
+      unoSaid[0] = true;
+      flashUnoButton("UNO hazır!", true);
+      addLogRow("SEN","UNO (önceden) dedi");
+      SFX.ding();
+      return;
+    }
+
+    // yanlış zaman
+    flashUnoButton("Şimdi olmaz", false);
+    SFX.buzz();
+  }
+
+  function flashUnoButton(text, success){
+    const btn = document.getElementById('btn-uno');
+    btn.innerText = text;
+
+    if(success){
+      btn.style.background = "green";
+      btn.style.color = "white";
+    }else{
+      btn.style.background = "crimson";
+      btn.style.color = "white";
+    }
+
+    // kısa süre sonra eski haline dön (senin istediğin)
+    setTimeout(()=> resetUnoButton(false), 1100);
+  }
+
+  function resetUnoButton(forceText){
+    const btn = document.getElementById('btn-uno');
+    btn.classList.remove('shout');
+    btn.style.background = "";
+    btn.style.color = "";
+    btn.innerText = "UNO!";
+  }
+
+  /* --- SOL ALT BİLGİLER --- */
+  function setLastMoveBadge(who, what){
+    document.getElementById('last-move-badge').innerText = `Son hamle: ${who} → ${what}`;
+  }
+
+  function addLogRow(who, what){
+    playLog.unshift({who, what, t: Date.now()});
+    if(playLog.length > 6) playLog.pop();
+    renderLog();
+  }
+
+  function renderLog(){
+    const el = document.getElementById('play-log');
+    if(playLog.length===0){ el.innerHTML=''; return; }
+    el.innerHTML = playLog.map(r =>
+      `<div class="row"><span class="who">${escapeHtml(r.who)}</span><span class="what">${escapeHtml(r.what)}</span></div>`
+    ).join('');
+  }
+
+  function renderScoreboard(){
+    const el = document.getElementById('scoreboard');
+    const lines = [
+      `<div class="title">Maç: El ${currentRound}/${MATCH.totalRounds}</div>`,
+      `<div class="muted">SEN: ${matchScores[0]} | Batı: ${matchScores[1]} | Kuzey: ${matchScores[2]} | Doğu: ${matchScores[3]}</div>`
+    ];
+    el.innerHTML = lines.join('');
+  }
+
+  /* --- FINAL MODAL --- */
+  function showFinalModal(){
+    const modal = document.getElementById('final-modal');
+    const subtitle = document.getElementById('final-subtitle');
+    const scoreBox = document.getElementById('final-scores');
+    const roundsBox = document.getElementById('final-rounds');
+
+    const max = Math.max(...matchScores);
+    const winners = [];
+    matchScores.forEach((s,i)=>{ if(s===max) winners.push(i); });
+    const winnerText = winners.length===1
+      ? `Kazanan: ${(winners[0]===0)?"SEN":playerName(winners[0])} (${max} el)`
+      : `Berabere: ${winners.map(i=> (i===0)?"SEN":playerName(i)).join(", ")} (${max} el)`;
+
+    subtitle.innerText = winnerText;
+
+    const labels = ["SEN","Batı","Kuzey","Doğu"];
+    scoreBox.innerHTML = labels.map((lab,i)=>`
+      <div class="final-box"><b>${lab}</b><br/>Kazandığı el: ${matchScores[i]}</div>
+    `).join('');
+
+    roundsBox.innerHTML = roundsHistory.map(r=>{
+      const w = r.winner;
+      const name = (w===0) ? "SEN" : playerName(w);
+      return `El ${r.round}: <b>${escapeHtml(name)}</b> kazandı`;
+    }).join('<br/>');
+
+    modal.style.display = 'flex';
+  }
+
+  function hideFinalModal(){
+    document.getElementById('final-modal').style.display = 'none';
+  }
+
+  /* --- AVATAR TEPKİLERİ --- */
+  function setAvatar(playerIdx, emoji, ms=800){
+    const idMap = { 0:null, 1:"av-1", 2:"av-2", 3:"av-3" };
+    if(playerIdx === 0) return; // kullanıcı avatarı yok (istersen ekleriz)
+    const el = document.getElementById(idMap[playerIdx]);
+    if(!el) return;
+    const old = el.innerText;
+    el.innerText = emoji;
+    setTimeout(()=>{ el.innerText = old; }, ms);
+  }
+
+  /* --- YARDIMCILAR --- */
+  function playerName(idx){
+    if(idx===1) return "Batı";
+    if(idx===2) return "Kuzey";
+    if(idx===3) return "Doğu";
+    return "SEN";
+  }
+
+  function translateColor(c){
+    if(c==='red') return 'Kırmızı';
+    if(c==='blue') return 'Mavi';
+    if(c==='green') return 'Yeşil';
+    if(c==='yellow') return 'Sarı';
+    return '';
+  }
+
+  function cardText(card, chosenColor){
+    const val = SYMBOLS[card.value] || card.value;
+    if(card.color==='black'){
+      const t = (card.type==='draw4') ? '+4' : '🌈';
+      return `Siyah ${t} (${translateColor(chosenColor)})`;
+    }
+    return `${translateColor(card.color)} ${val}`;
+  }
+
+  function escapeHtml(s){
+    return String(s)
+      .replaceAll('&','&amp;')
+      .replaceAll('<','&lt;')
+      .replaceAll('>','&gt;')
+      .replaceAll('"','&quot;')
+      .replaceAll("'","&#039;");
+  }
+
+  /* --- İLK BAŞLAT --- */
+  window.onload = startNewMatch;
+</script>
+</body>
+</html>
